@@ -65,3 +65,38 @@ npm test
 Ứng dụng đọc các biến DB từ environment; `.env` được Docker Compose đọc, không tự được Node đọc. Cách chạy khuyến nghị là Compose.
 
 Xem Documentation/TESTING.md và DEMO.md. Đây là bản thực hành chức năng, chưa có đăng nhập/phân quyền người dùng, session dùng MemoryStore và DB runtime đang dùng tài khoản init. Chưa coi các tiêu chí hardening, Nginx, monitoring, logging, GitHub hay báo cáo là hoàn thành.
+## Giám sát bằng Prometheus và Grafana
+
+Khởi động toàn bộ hệ thống:
+
+    docker compose up -d --build
+
+Trước lần chạy đầu tiên, sao chép `.env.example` thành `.env`
+và thay các mật khẩu mẫu bằng mật khẩu mạnh.
+
+- Website qua Nginx: http://localhost:8088
+- pgAdmin: http://localhost:5050
+- Prometheus: http://localhost:9090
+- Grafana: http://localhost:3000
+
+Đăng nhập Grafana bằng GRAFANA_ADMIN_USER và
+GRAFANA_ADMIN_PASSWORD trong `.env`.
+
+Prometheus thu thập metrics từ chính Prometheus, cAdvisor,
+Nginx Exporter và PostgreSQL Exporter.
+Kiểm tra tại http://localhost:9090/targets: cả 4 target phải UP.
+
+Grafana tự nạp nguồn dữ liệu Prometheus và dashboard
+“PetShop — Container, Nginx & PostgreSQL” từ cấu hình provisioning.
+
+Dashboard gồm 6 panel:
+1. Trạng thái các mục tiêu giám sát.
+2. RAM sử dụng của từng container.
+3. CPU sử dụng của từng container.
+4. Số yêu cầu HTTP mỗi giây qua Nginx.
+5. Trạng thái kết nối PostgreSQL.
+6. Số kết nối tới database PetShop.
+
+Nếu chỉnh dashboard trong giao diện Grafana, cần xuất lại JSON
+và cập nhật Infrastructure/monitoring/grafana/dashboards/petshop-overview.json
+để lưu thay đổi cùng mã nguồn.
