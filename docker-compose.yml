@@ -119,8 +119,28 @@ services:
       postgres:
         condition: service_healthy
     restart: unless-stopped
+  loki:
+    image: grafana/loki:3.4.2
+    command: ["-config.file=/etc/loki/loki.yml"]
+    volumes:
+      - ./Infrastructure/logging/loki/loki.yml:/etc/loki/loki.yml:ro
+      - loki_data:/loki
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:3.4.2
+    command: ["-config.file=/etc/promtail/promtail.yml"]
+    volumes:
+      - ./Infrastructure/logging/promtail/promtail.yml:/etc/promtail/promtail.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - promtail_data:/var/lib/promtail
+    depends_on:
+      - loki
+    restart: unless-stopped
 volumes:
   petshop_data:
   pgadmin_data:
   prometheus_data:
   grafana_data:
+  loki_data:
+  promtail_data:

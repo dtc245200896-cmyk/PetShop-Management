@@ -100,3 +100,17 @@ Dashboard gồm 6 panel:
 Nếu chỉnh dashboard trong giao diện Grafana, cần xuất lại JSON
 và cập nhật Infrastructure/monitoring/grafana/dashboards/petshop-overview.json
 để lưu thay đổi cùng mã nguồn.
+
+## Log tập trung với Loki và Promtail
+
+Khởi động dịch vụ log:
+    docker compose up -d loki promtail
+
+Promtail thu thập log các container thuộc project petshop_node_de28
+và gửi tới Loki. Grafana kết nối Loki qua http://loki:3100.
+
+Xem log tại http://localhost:3000:
+Explore > chọn loki > Code > nhập LogQL > Run query.
+Chọn Last 15 minutes; nếu chưa có log, truy cập website rồi chạy lại.
+
+Ba truy vấn và lệnh tạo log thử được ghi trong [Documentation/LOGQL.md](Documentation/LOGQL.md).
