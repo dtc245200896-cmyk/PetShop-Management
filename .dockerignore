@@ -1,0 +1,7 @@
+node_modules
+.git
+.env
+Documentation
+Backend/tests
+Database
+CI-CD
