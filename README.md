@@ -114,3 +114,38 @@ Explore > chọn loki > Code > nhập LogQL > Run query.
 Chọn Last 15 minutes; nếu chưa có log, truy cập website rồi chạy lại.
 
 Ba truy vấn và lệnh tạo log thử được ghi trong [Documentation/LOGQL.md](Documentation/LOGQL.md).
+## Hardening hệ thống
+
+- Ứng dụng chạy bằng tài khoản node, UID 1000.
+- Filesystem của ứng dụng chỉ đọc; /tmp sử dụng tmpfs.
+- Ứng dụng bỏ toàn bộ Linux capabilities và bật no-new-privileges.
+- Tách mạng frontend, backend và monitoring. Mạng backend đặt internal: true.
+- PostgreSQL không công khai cổng ra máy host.
+- Nginx bổ sung 5 security headers.
+- Ứng dụng kết nối PostgreSQL bằng petshop_app, chỉ có quyền
+  SELECT, INSERT, UPDATE, DELETE trên 4 bảng nghiệp vụ và quyền dùng sequence.
+- petshop_app không có quyền superuser, tạo database, tạo role
+  hoặc tạo bảng trong schema public.
+
+### Cấu hình tài khoản database
+
+Trong .env, đặt APP_DB_USER=petshop_app và cấu hình APP_DB_PASSWORD.
+POSTGRES_USER và POSTGRES_PASSWORD dành cho tài khoản quản trị database.
+
+Khi khởi tạo database mới, Database/03-roles.sql tự tạo và phân quyền
+petshop_app. Với database đã tồn tại, áp dụng bằng lệnh:
+
+    docker compose exec postgres psql -U petshop_lab -d petshop -v ON_ERROR_STOP=1 -f /docker-entrypoint-initdb.d/03-roles.sql
+
+Nếu thay đổi APP_DB_PASSWORD, cần tạo lại container postgres để cập nhật
+biến môi trường, chạy lại lệnh phân quyền trên và tạo lại container app.
+
+Không commit .env. Khi triển khai, sử dụng mật khẩu mạnh, riêng biệt
+cho database, pgAdmin và Grafana.
+
+### Giới hạn bảo mật
+
+cAdvisor chạy privileged để thu thập thông tin container.
+Promtail truy cập Docker socket để lấy log; mount read-only không
+loại bỏ quyền truy cập Docker API. Đây là các thành phần cần được
+bảo vệ khi triển khai ngoài môi trường thực hành.

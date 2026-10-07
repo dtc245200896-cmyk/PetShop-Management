@@ -1,6 +1,7 @@
 name: petshop_node_de28
 services:
   app:
+    networks: [frontend, backend]
     build:
       context: .
       dockerfile: Infrastructure/Dockerfile
@@ -8,12 +9,19 @@ services:
       NODE_ENV: development
       DB_HOST: postgres
       POSTGRES_DB: ${POSTGRES_DB:?Copy .env.example to .env}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_USER: ${APP_DB_USER:?Set APP_DB_USER in .env}
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}
       SESSION_SECRET: ${SESSION_SECRET}
       TZ: Asia/Ho_Chi_Minh
     expose:
       - "3000"
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       postgres:
         condition: service_healthy
@@ -30,15 +38,18 @@ services:
       timeout: 5s
       retries: 10
   postgres:
+    networks: [backend]
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:?Set APP_DB_PASSWORD in .env}
     volumes:
       - petshop_data:/var/lib/postgresql/data
       - ./Database/01-schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
       - ./Database/02-seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      - ./Database/03-roles.sql:/docker-entrypoint-initdb.d/03-roles.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
@@ -46,6 +57,7 @@ services:
       retries: 20
     restart: unless-stopped
   pgadmin:
+    networks: [frontend, backend]
     image: dpage/pgadmin4:9
     environment:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
@@ -59,6 +71,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
   nginx:
+    networks: [frontend, monitoring]
     image: nginx:stable-alpine
     ports:
       - "127.0.0.1:${WEB_PORT:-8088}:80"
@@ -69,6 +82,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
   prometheus:
+    networks: [monitoring]
     image: prom/prometheus:v3.2.1
     ports:
       - "127.0.0.1:${PROMETHEUS_PORT:-9090}:9090"
@@ -78,6 +92,7 @@ services:
     restart: unless-stopped
 
   grafana:
+    networks: [monitoring]
     image: grafana/grafana:11.6.0
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
@@ -92,6 +107,7 @@ services:
     restart: unless-stopped
 
   cadvisor:
+    networks: [monitoring]
     image: gcr.io/cadvisor/cadvisor:v0.49.2
     privileged: true
     volumes:
@@ -102,6 +118,7 @@ services:
     restart: unless-stopped
 
   nginx-exporter:
+    networks: [monitoring]
     image: nginx/nginx-prometheus-exporter:1.4.1
     command:
       - "--nginx.scrape-uri=http://nginx:8081/stub_status"
@@ -110,6 +127,7 @@ services:
     restart: unless-stopped
 
   postgres-exporter:
+    networks: [backend, monitoring]
     image: prometheuscommunity/postgres-exporter:v0.17.1
     environment:
       DATA_SOURCE_URI: "postgres:5432/${POSTGRES_DB}?sslmode=disable"
@@ -120,6 +138,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
   loki:
+    networks: [monitoring]
     image: grafana/loki:3.4.2
     command: ["-config.file=/etc/loki/loki.yml"]
     volumes:
@@ -128,6 +147,7 @@ services:
     restart: unless-stopped
 
   promtail:
+    networks: [monitoring]
     image: grafana/promtail:3.4.2
     command: ["-config.file=/etc/promtail/promtail.yml"]
     volumes:
@@ -144,3 +164,12 @@ volumes:
   grafana_data:
   loki_data:
   promtail_data:
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge
+    internal: true
+  monitoring:
+    driver: bridge
